@@ -1,4 +1,5 @@
 import requests
+from bs4 import BeautifulSoup
 
 domain = 'https://en.wikipedia.org'
 
@@ -32,10 +33,34 @@ class Link:
         return self.__repr__()
 
 
+class Flag(Link):
+
+    @staticmethod
+    def getFlagDetailFromDetailPage(page: str) -> Link:
+        soup = BeautifulSoup(page, "html.parser")
+        image = soup.find('a', attrs={'class': 'image'})
+        return Link(domain + image['href'])
+
+    @staticmethod
+    def getImageLinkFromFlagPage(page: str) -> Link:
+        soup = BeautifulSoup(page, "html.parser")
+        return Link('https:' + soup.find('div', attrs={'class': 'fullMedia'}).find('a')['href'])
+
+    def downloadPNG(self, path: str):
+        self.downloadContent(path)
+
+    def downloadSVG(self, path: str):
+        self.getImageLinkFromFlagPage(
+            self.getFlagDetailFromDetailPage(
+                self.link
+            ).getText()
+        ).downloadContent(path)
+
+
 class Country:
     code: str
     name: str
-    flag_page_link: Link
+    flag_page_link: Flag
     flag_link: Link
     flag_file: str
 

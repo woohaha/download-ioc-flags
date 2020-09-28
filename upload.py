@@ -20,6 +20,6 @@ class QiniuProvider:
         key = f'{remoteDir}/{remoteFileName}'
         token = self.q.upload_token(bucket=self.bucket, key=key)
         ret, info = put_file(token, key, filePath)
-        url = f'{self.domain}/{ret["key"]}'
+        url = f'https://{self.domain}/{ret["key"]}'
         print(f'uploaded to {url}')
         return Link(url)

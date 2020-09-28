@@ -2,11 +2,31 @@ import os
 from concurrent.futures._base import as_completed
 from concurrent.futures.thread import ThreadPoolExecutor
 from datetime import datetime
+from typing import List
+
+from bs4 import BeautifulSoup
 
 from SQLExporter import SQLExporter
-from model import Country, Link, domain
-from parser import parseTable, getFlagDetailFromDetailPage, getImageLinkFromFlagPage
+from model import Country, Link, domain, Flag
 from upload import QiniuProvider
+
+
+def parseTable(page: str) -> List[Country]:
+    list = []
+    soup = BeautifulSoup(page, "html.parser")
+    codeTable = soup.find_all('table', attrs={'class': 'wikitable'})[0].find_all('tr')
+    for countryTable in codeTable:
+        country = Country()
+        try:
+            country.code = countryTable.span.text
+            country.name = countryTable.a.text
+            # country.flag_page_link = Flag(domain + countryTable.a['href']) # 需要svg格式时
+            country.flag_page_link = Flag("https:" + countryTable.img['src'].replace("22px", "480px")) # 需要png格式
+            list.append(country)
+        except AttributeError:
+            pass
+    return list
+
 
 
 class ExecutorParams:
@@ -23,14 +43,12 @@ def executor(param: ExecutorParams):
     country = param.country
     q = param.q
     writer = param.writer
-    country.flag_file = f'./flags/{country.code}.svg'
+    country.flag_file = f'./flags/{country.code}.png'
 
     if not os.path.exists(country.flag_file):
-        getImageLinkFromFlagPage(
-            getFlagDetailFromDetailPage(
-                country.flag_page_link.getText()
-            ).getText()
-        ).downloadContent(
+        # country.flag_page_link.downloadSVG(
+        #     country.flag_file)
+        country.flag_page_link.downloadPNG(
             country.flag_file)
 
     country.flag_link = q.upload(country.flag_file)
@@ -46,9 +64,6 @@ def main():
     with ThreadPoolExecutor(max_workers=10) as pool:
         allTasks = []
 
-        # csvfile = open('countryList.csv', 'w', encoding="utf-8")
-        # csvWriter = csv.writer(csvfile)
-        #
         sqlFile = open('countryList.sql', 'w', encoding="utf-8")
         sqlWriter = SQLExporter(sqlFile, 'nationality', ['name', 'code', 'flag'])
 
@@ -59,7 +74,6 @@ def main():
         for task in as_completed(allTasks):
             print(f'{task.result()} downloaded.')
 
-        # csvfile.close()
         sqlFile.close()
 
         endTime = datetime.now()
